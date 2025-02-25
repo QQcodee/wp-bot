@@ -108,6 +108,60 @@ app.post("/connect", async (req, res) => {
   }
 });
 
+// *********************** NUEVA FUNCIÓN DE CHEQUEO DE NÚMEROS ************************ //
+
+// Función para verificar si un número está registrado en WhatsApp
+const checkNumberStatus = async (number) => {
+  if (!sock) {
+    throw new Error("WhatsApp session is not active.");
+  }
+  try {
+    // La función onWhatsApp recibe el número en formato internacional
+    const result = await sock.onWhatsApp(number);
+    if (result && result.length > 0) {
+      return { number: number, isRegistered: true };
+    } else {
+      return { number: number, isRegistered: false };
+    }
+  } catch (error) {
+    console.error(`Error checking number ${number}:`, error);
+    return { number: number, isRegistered: false, error: error.message };
+  }
+};
+
+// Endpoint para checar una lista de números
+app.post("/check-numbers", async (req, res) => {
+  const { numbers } = req.body; // Se espera un arreglo de números en formato internacional
+  if (!numbers || !Array.isArray(numbers)) {
+    return res
+      .status(400)
+      .json({ error: "Debe proporcionar una lista de números." });
+  }
+
+  if (!sock) {
+    return res.status(404).json({ error: "WhatsApp session is not active." });
+  }
+
+  try {
+    const results = [];
+    // Procesa cada número de la lista de forma secuencial para evitar bloqueos
+    for (const number of numbers) {
+      const result = await checkNumberStatus(number);
+      results.push(result);
+      // Se recomienda agregar un retraso aleatorio si la lista es muy grande, por ejemplo:
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.floor(Math.random() * 2000) + 1000)
+      );
+    }
+    res.json({ results });
+  } catch (error) {
+    console.error("Error checking numbers:", error);
+    res.status(500).json({ error: "Failed to check numbers." });
+  }
+});
+
+// ************************************************************************************ //
+
 // Send messages to multiple contacts
 let cancelSending = false; // Flag to cancel sending
 
@@ -119,8 +173,8 @@ let currentProgress = {
   completed: 0,
   current: null,
   status: "idle", // idle, sending, canceled
-  minDelay: 5000,
-  maxDelay: 6000,
+  minDelay: 8000,
+  maxDelay: 15000,
 };
 
 let currentMessage = "";
@@ -147,8 +201,8 @@ app.post("/cancel-sending", (req, res) => {
     completed: 0,
     current: null,
     status: "canceled", // idle, sending, canceled
-    minDelay: 5000,
-    maxDelay: 6000,
+    minDelay: 8000,
+    maxDelay: 15000,
   };
   res.status(200).json({ success: true, message: "Batch sending canceled." });
 });
@@ -189,8 +243,8 @@ app.post("/send-messages", async (req, res) => {
       batch: 0,
     };
 
-    const BATCH_SIZE = 50; // Number of contacts per batch
-    const HOUR_IN_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+    const BATCH_SIZE = 15; // Number of contacts per batch
+    const HOUR_IN_MS = 60 * 10 * 1000; // 1 hour in milliseconds
 
     // Split contacts into batches
     const contactBatches = [];
@@ -227,7 +281,8 @@ app.post("/send-messages", async (req, res) => {
           // Construct the payload
           const payload = {};
           if (image) {
-            payload.image = { url: image }; // Attach the image URL
+            const imageUrl = image.replace("{name}", contact.name);
+            payload.image = { url: imageUrl }; // Attach the image URL
             if (personalizedMessage) {
               payload.caption = personalizedMessage; // Add caption if message exists
             }
