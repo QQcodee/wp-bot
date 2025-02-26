@@ -29,7 +29,7 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const PORT = process.env.PORT || 3001;
-const AUTH_DIR = "baileys_auth"; // Directory for storing auth state
+const AUTH_DIR = "dental_reviews"; // Directory for storing auth state
 
 app.use(
   cors({
@@ -91,7 +91,7 @@ startSock();
 
 // Connect to the WhatsApp session
 app.post("/connect", async (req, res) => {
-  if (sock) {
+  if (sock?.user?.id) {
     console.log("Session is already active.", sock.user.id);
 
     return res
