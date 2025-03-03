@@ -85,7 +85,7 @@ const stopSock = (account) => {
 };
 
 // Start both sessions on server start (optional)
-Object.keys(AUTH_DIRS).forEach(startSock);
+//Object.keys(AUTH_DIRS).forEach(startSock);
 
 // API to start a specific WhatsApp session
 app.post("/start/:account", async (req, res) => {
