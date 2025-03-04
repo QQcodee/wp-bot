@@ -111,10 +111,13 @@ const TiptapEditor = ({ setMessage }) => {
           }
           handleEditorFocus();
         }}
-        className="h-full w-full flex justify-center   rounded-lg p-2 overflow-auto"
+        className="max-h-[500px] w-full flex justify-center  py-2 px-2 overflow-y-scroll "
         style={{ whiteSpace: "pre-wrap" }}
       >
-        <EditorContent editor={editor} className="!max-w-xs" />
+        <EditorContent
+          editor={editor}
+          className="w-full border p-4 rounded-lg max-h-[500px] overflow-y-scroll"
+        />
       </div>
     </div>
   );

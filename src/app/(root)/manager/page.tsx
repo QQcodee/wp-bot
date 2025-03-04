@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 
 import axios from "axios";
 import io from "socket.io-client";
+import JsonBuilder from "@/components/JsonBuilder";
 
 // Connect to Socket.io server
 const socket = io("http://localhost:3001"); // Backend server URL
@@ -249,6 +250,8 @@ function App() {
         </form>
         {status && <p className="mt-4 text-lg text-green-600">{status}</p>}
       </div>
+
+      <JsonBuilder />
     </div>
   );
 }

@@ -24,6 +24,16 @@ app.use(bodyParser.json());
 let sockets = {}; // Store active socket sessions
 let campaigns = {}; // Store active campaigns
 
+// Log active campaigns every 30 seconds
+schedule.scheduleJob("*/30 * * * * *", () => {
+  console.log("Active campaigns:");
+  Object.keys(campaigns).forEach((campaignId) => {
+    console.log(
+      `  - ${campaignId}: ${JSON.stringify(campaigns[campaignId], null, 2)}`
+    );
+  });
+});
+
 // Function to start a WhatsApp session
 const startSock = async (account) => {
   if (!AUTH_DIRS[account]) {
@@ -125,18 +135,22 @@ app.post("/schedule-campaign/:account", async (req, res) => {
   };
 
   // Schedule the campaign messages at the specified time
-  schedule.scheduleJob(scheduleTime, async () => {
-    console.log(`Campaign ${campaignId} is starting at ${scheduleTime}`);
-
-    // Start WhatsApp session just before sending messages
+  const startSockTime = new Date(scheduleTime.getTime() - 10000);
+  schedule.scheduleJob(startSockTime, async () => {
     console.log(`Starting WhatsApp session for campaign ${campaignId}`);
     await startSock(account);
+  });
+
+  schedule.scheduleJob(scheduleTime, async () => {
+    console.log(`Campaign ${campaignId} is starting at ${scheduleTime}`);
 
     // Process and send messages
     await processCampaign(campaignId);
   });
 
-  res.status(200).json({ message: "Campaign scheduled", campaignId });
+  res
+    .status(200)
+    .json({ ...campaigns[campaignId], message: "Campaign scheduled" });
 });
 
 // Function to process the campaign when scheduled
@@ -155,16 +169,16 @@ async function processCampaign(campaignId) {
   } = campaign;
   let index = 0;
 
-  const job = schedule.scheduleJob(`*/${timeout} * * * * *`, async function () {
-    if (index >= contacts.length) {
-      job.cancel();
+  // Function to process and send a batch of messages
+  const sendBatchMessages = async () => {
+    const batch = contacts.slice(index, index + batchSize);
+    if (batch.length === 0) {
       campaigns[campaignId].status = "completed";
-      stopSock(account);
       console.log(`Campaign ${campaignId} completed.`);
+      stopSock(account);
       return;
     }
 
-    const batch = contacts.slice(index, index + batchSize);
     console.log(
       `Campaign ${campaignId}: Sending batch of ${batch.length} messages`
     );
@@ -178,25 +192,35 @@ async function processCampaign(campaignId) {
       console.log(
         `Campaign ${campaignId}: Sending message to ${contact.phone} with ${delay}ms delay`
       );
+
       await sendMessage(
         account,
         contact.phone,
         personalizedMessage,
         personalizedImage
       );
-      await new Promise((r) => setTimeout(r, delay));
+      await new Promise((r) => setTimeout(r, delay)); // Delay between sending each message
     }
 
+    // Update the index to the next batch
     index += batchSize;
 
+    // Schedule the next batch with the timeout delay
     if (index < contacts.length) {
       console.log(
         `Campaign ${campaignId}: Waiting for next batch with ${
           timeout * 1000
         }ms delay`
       );
+      setTimeout(sendBatchMessages, timeout * 1000); // Delay between batches
+    } else {
+      // Stop the sock after the last batch
+      stopSock(account);
     }
-  });
+  };
+
+  // Start sending the first batch
+  sendBatchMessages();
 }
 
 function getRandomDelay([min, max]) {
@@ -243,6 +267,64 @@ app.post("/stop-campaign/:campaignId", (req, res) => {
   res
     .status(200)
     .json({ message: `Campaign ${campaignId} stopped successfully.` });
+});
+
+app.post("/send-message/:account", async (req, res) => {
+  const { account } = req.params;
+  const { phone, message, image } = req.body;
+
+  if (!AUTH_DIRS[account]) {
+    return res.status(400).json({ error: "Invalid account name." });
+  }
+  if (!phone || (!message && !image)) {
+    return res.status(400).json({ error: "Invalid request parameters." });
+  }
+  if (!sockets[account]) {
+    return res
+      .status(500)
+      .json({ error: `WhatsApp session for ${account} is not active.` });
+  }
+
+  try {
+    const jid = `${phone}@s.whatsapp.net`;
+    const payload = image
+      ? { image: { url: image }, caption: message }
+      : { text: message };
+    await sockets[account].sendMessage(jid, payload);
+    res.status(200).json({
+      success: true,
+      message: `Message sent successfully from ${account}.`,
+    });
+  } catch (error) {
+    console.error(`Error sending message from ${account}:`, error);
+    res.status(500).json({ error: `Failed to send message from ${account}.` });
+  }
+});
+
+app.post("/start/:account", async (req, res) => {
+  const { account } = req.params;
+
+  if (!AUTH_DIRS[account]) {
+    return res.status(400).json({ error: "Invalid account name." });
+  }
+
+  await startSock(account);
+  res.status(200).json({ message: `Session started for ${account}.` });
+});
+
+// API to stop a specific WhatsApp session
+app.post("/stop/:account", (req, res) => {
+  const { account } = req.params;
+
+  if (!AUTH_DIRS[account]) {
+    return res.status(400).json({ error: "Invalid account name." });
+  }
+
+  if (stopSock(account)) {
+    res.status(200).json({ message: `Session stopped for ${account}.` });
+  } else {
+    res.status(400).json({ error: `Session for ${account} is not running.` });
+  }
 });
 
 // Start the server
