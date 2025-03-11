@@ -1,11 +1,43 @@
 "use client";
-import { PlusCircleIcon, Trash, Upload } from "lucide-react";
+import {
+  Copy,
+  Plus,
+  PlusCircleIcon,
+  Send,
+  Settings,
+  Settings2,
+  Trash,
+  Upload,
+} from "lucide-react";
 import React from "react";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { formatISO, set } from "date-fns";
+
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import Papa from "papaparse"; // Import PapaParse for CSV parsing
 import { ToastContainer, toast } from "react-toastify";
@@ -23,29 +55,21 @@ import TiptapEditor from "@/components/TipTap";
 import supabase from "@/config/supabaseClient";
 import { Textarea } from "@/components/ui/textarea";
 import { useSocket } from "@/hooks/use-socket";
+import { Button } from "@/components/ui/button";
 
 const API_BASE = "http://localhost:3001";
 
 const Home = () => {
   const { campaigns, sessionStatus, campaignStatus, progress, message } =
     useSocket();
-  //console.log("Campaigns:", campaigns);
 
-  const [currentCampaign, setCurrentCampaign] = useState({
-    batchSize: 50,
-    timeout: 120,
-    randomDelay: [10000, 15000],
-    account: "default",
-    template: "",
-    contacts: [],
-    datetime: new Date(),
-    imageUrl: "",
-  });
-  //console.log("Current campaign:", currentCampaign);
+  const [availableAccounts, setAvailableAccounts] = useState(["Buscando..."]);
+
+  const { toast: notify } = useToast();
 
   const [batchSize, setBatchSize] = useState(2);
   const [timeout, setTimeout] = useState(30);
-  const [randomDelay, setRandomDelay] = useState([10000, 15000]);
+  const [randomDelay, setRandomDelay] = useState([20000, 35000]);
   const [template, setTemplate] = useState();
   const [contacts, setContacts] = useState([]);
 
@@ -55,7 +79,53 @@ const Home = () => {
 
   const [contactsTable, setContactsTable] = useState([]);
 
-  const [socketStatus, setSocketStatus] = useState(false);
+  const [testAccount, setTestAccount] = useState("");
+
+  const [account, setAccount] = useState("default");
+  //console.log("Current account:", account);
+  const [testMessage, setTestMessage] = useState("");
+  const [testNumber, setTestNumber] = useState("");
+  const [testImgUrl, setTestImgUrl] = useState("");
+
+  const [currentCampaign, setCurrentCampaign] = useState({
+    batchSize: 50,
+    timeout: 120,
+    randomDelay: [20000, 35000],
+    account: "default",
+    template: template ? template : "",
+    contacts: [],
+    datetime: new Date(),
+    imageUrl: "",
+    newCampaign: true,
+  });
+
+  useEffect(() => {
+    const fetchFolderNames = async () => {
+      try {
+        // Replace 'your-bucket-name' with your actual bucket name
+        const { data, error } = await supabase.storage
+          .from("whatsapp-sessions")
+          .list("", { limit: 100, offset: 0 });
+
+        if (error) {
+          console.error("Error fetching folders:", error);
+          return;
+        }
+
+        // Extract unique folder names and store them in availableAccounts
+        const folders = [
+          ...new Set(data.map((file) => file.name.split("/")[0])),
+        ];
+
+        // Set the state with the folder names
+        setAvailableAccounts(folders);
+      } catch (error) {
+        console.error("Error listing folders:", error);
+      }
+    };
+
+    fetchFolderNames();
+  }, []); // Empty dependency array to run only once on component load
 
   useEffect(() => {
     setTemplate(currentCampaign.template);
@@ -71,11 +141,12 @@ const Home = () => {
     setBatchSize(currentCampaign.batchSize);
     setTimeout(currentCampaign.timeout);
     setRandomDelay(currentCampaign.randomDelay);
+    setAccount(currentCampaign.account);
   }, [currentCampaign]);
 
   useEffect(() => {
     if (campaigns.length > 0) {
-      setCurrentCampaign(campaigns[0]);
+      setCurrentCampaign({ ...campaigns[0], newCampaign: null });
     }
   }, [campaigns]);
 
@@ -107,7 +178,7 @@ const Home = () => {
     }, interval);
 
     return () => clearInterval(timer); // Cleanup on unmount or message change
-  }, [message, currentCampaign]);
+  }, [message]);
 
   const messages = [
     {
@@ -229,11 +300,72 @@ const Home = () => {
     }
   };
 
+  const handleCSVInput = (event) => {
+    const pastedData = event.target.value;
+
+    if (!pastedData) {
+      toast.error("Por favor, pegue datos en el cuadro de texto.");
+      return;
+    }
+
+    // Parse the pasted data (handling both commas and tab spaces)
+    const rows = pastedData
+      .trim()
+      .split("\n")
+      .map((row) => row.split(/\t|,/));
+
+    if (rows.length < 2) {
+      toast.error("El formato de los datos pegados no es válido.");
+      return;
+    }
+
+    // Check headers
+    const headers = rows[0].map((header) => header.trim().toLowerCase());
+    if (headers[0] !== "name" || headers[1] !== "phone") {
+      toast.error("El CSV debe tener 'name' y 'phone' en la primera fila.");
+      return;
+    }
+
+    // Validate rows
+    const invalidRows = [];
+    const parsedContacts = rows
+      .slice(1) // Skip headers
+      .filter((row) => row.length >= 2 && row[0] && row[1]) // Ensure name & phone exist
+      .map((row, index) => {
+        const phone = row[1].trim();
+        if (!/^\d{13}$/.test(phone)) {
+          invalidRows.push(index + 2); // Store row number for error message
+          return null; // Mark invalid rows
+        }
+        return {
+          name: row[0].trim(),
+          phone,
+        };
+      })
+      .filter(Boolean); // Remove invalid rows (nulls)
+
+    if (parsedContacts.length === 0) {
+      toast.error("No se encontraron contactos válidos.");
+      return;
+    }
+
+    if (invalidRows.length > 0) {
+      toast.error(`${invalidRows.length} contactos no son válidos.`);
+    }
+
+    setContacts(parsedContacts);
+    setContactsTable(
+      parsedContacts.map((contact) => ({ ...contact, sent: false }))
+    );
+
+    toast.success("Lista de contactos cargada!");
+  };
+
   const sendJson = async () => {
     const jsonData = buildJson();
     try {
       const response = await fetch(
-        "http://localhost:3001/schedule-campaign/dental_reviews",
+        `http://localhost:3001/schedule-campaign/${account}`,
         {
           method: "POST",
           headers: {
@@ -248,42 +380,287 @@ const Home = () => {
       console.error("Error:", error);
     }
   };
+
+  const stopCampaign = async () => {
+    if (!currentCampaign?.id) {
+      console.error("No campaign ID found.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:3001/stop-campaign/${currentCampaign.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to stop campaign: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log("Campaign stopped successfully:", result);
+      setCurrentCampaign({
+        batchSize: 50,
+        timeout: 120,
+        randomDelay: [20000, 35000],
+        account: "default",
+        template: "",
+        contacts: [],
+        datetime: new Date(),
+        imageUrl: "",
+        newCampaign: true,
+        id: null,
+      });
+    } catch (error) {
+      console.error("Error stopping campaign:", error);
+    }
+  };
+
   const handleSelectChange = (event) => {
     const selectedId = event.target.value;
     const selectedCampaign = campaigns.find((c) => c.id === selectedId);
-    setCurrentCampaign(selectedCampaign);
+
+    setCurrentCampaign({
+      ...selectedCampaign,
+      id: selectedId,
+      newCampaign: null,
+    });
+  };
+
+  const handleStartSocket = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001/start/${testAccount}`,
+        {
+          method: "POST",
+        }
+      );
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error starting socket:", error);
+    }
+  };
+
+  const handleStopSocket = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001/stop/${testAccount}`,
+        {
+          method: "POST",
+        }
+      );
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error stopping socket:", error);
+    }
+  };
+
+  const handleSendTestMessage = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001/send-message/${testAccount}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phone: testNumber,
+            message: testMessage,
+            image: "",
+          }),
+        }
+      );
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error sending test message:", error);
+    }
   };
 
   return (
     <div className="w-screen h-screen max-h-screen p-5 flex flex-col overflow-hidden">
       {/* Header with fixed height */}
+      <ToastContainer />
       <div className="h-16 w-full flex items-center gap-5 justify-between">
         <div className="flex gap-5 items-center">
-          <h1 className="m-0">Campañas</h1>
+          <h1 className="m-0">QQs Chat Bot</h1>
           {campaigns.length > 0 ? (
-            <select
-              onChange={handleSelectChange}
-              value={currentCampaign?.id || ""}
-            >
-              {campaigns.map((campaign) => (
-                <option key={campaign.id} value={campaign.id}>
-                  {campaign.account} - {campaign.id}
-                </option>
-              ))}
-            </select>
+            <>
+              {" "}
+              <select
+                value={currentCampaign?.id || ""}
+                onChange={handleSelectChange}
+                className="border border-gray-300 rounded-md px-2 py-1"
+              >
+                <option value="">Select campaign</option>
+                {campaigns.map((campaign) => (
+                  <option key={campaign.id} value={campaign.id}>
+                    {campaign.account} - {campaign.id}
+                  </option>
+                ))}
+              </select>
+              <PlusCircleIcon
+                onClick={() =>
+                  setCurrentCampaign({
+                    batchSize: 50,
+                    timeout: 120,
+                    randomDelay: [20000, 35000],
+                    account: "default",
+                    template: "",
+                    contacts: [],
+                    datetime: new Date(),
+                    imageUrl: "",
+                    newCampaign: true,
+                    id: null,
+                  })
+                }
+                className="w-6 h-6 cursor-pointer text-green-500"
+              />
+            </>
           ) : (
-            <p>No campaigns available</p>
+            <>
+              <p>No campaigns available</p>
+              <PlusCircleIcon
+                onClick={() =>
+                  setCurrentCampaign({
+                    batchSize: 50,
+                    timeout: 120,
+                    randomDelay: [20000, 35000],
+                    account: "default",
+                    template: "",
+                    contacts: [],
+                    datetime: new Date(),
+                    imageUrl: "",
+                    newCampaign: true,
+                    id: null,
+                  })
+                }
+                className="w-6 h-6  cursor-pointer text-green-500"
+              />
+            </>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            className={`bg-${socketStatus ? "red" : "green"}-500 hover:bg-${
-              socketStatus ? "red" : "green"
-            }-700 text-white font-bold py-2 px-4 rounded`}
-            onClick={() => setSocketStatus(!socketStatus)}
-          >
-            {socketStatus ? "Apagar Socket" : "Encender Socket"}
-          </button>
+          <Dialog>
+            <DialogTrigger>
+              {" "}
+              <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded">
+                <Send className="w-6 h-6" /> Enviar Mensaje de Prueba
+              </button>
+            </DialogTrigger>
+            <DialogContent className="p-10">
+              <DialogHeader>
+                <DialogTitle className="mb-5 text-center">
+                  Enviar Mensaje de Prueba
+                </DialogTitle>
+
+                <DialogDescription className="flex flex-col gap-5">
+                  <div>
+                    <span>
+                      Selecciona de que numero quieres enviar el mensaje
+                    </span>
+                    <select
+                      value={testAccount}
+                      onChange={(e) => setTestAccount(e.target.value)}
+                      id="account-select"
+                      className="w-full border rounded-md px-3 py-2"
+                    >
+                      {availableAccounts.map((accountName) => (
+                        <option key={accountName} value={accountName}>
+                          {accountName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className=" hidden flex justify-between items-center">
+                    {" "}
+                    <span>Socket Status</span>
+                    <Switch className="transform scale-[1.2]" />{" "}
+                  </div>
+                  <div className="flex flex-col">
+                    {" "}
+                    <span>Iniciar Socket</span>
+                    <select
+                      value={testAccount}
+                      onChange={(e) => setTestAccount(e.target.value)}
+                      id="account-select"
+                      className="w-full border rounded-md px-3 py-2"
+                    >
+                      {availableAccounts.map((accountName) => (
+                        <option key={accountName} value={accountName}>
+                          {accountName}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex justify-between items-center gap-2 mt-2">
+                      <button
+                        onClick={handleStartSocket}
+                        className="w-full bg-blue-500 text-white px-4 py-2"
+                      >
+                        Iniciar
+                      </button>
+                      <button
+                        onClick={handleStopSocket}
+                        className="w-full bg-red-500 text-white px-4 py-2"
+                      >
+                        Detener
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <span>Enviar mensaje a:</span>
+                    <Input
+                      onChange={(e) => setTestNumber(e.target.value)}
+                      className="w-full"
+                      placeholder="521 614 303 5198"
+                    />
+                  </div>
+                  <div>
+                    <span>Mensaje:</span>
+                    <Input
+                      className="w-full"
+                      placeholder={`Hola, esta es una prueba`}
+                      onChange={(e) => setTestMessage(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <span>Url de Imagen:</span>
+                    <Input
+                      className="w-full"
+                      placeholder={`Url de Imagen`}
+                      onChange={(e) => setTestImgUrl(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSendTestMessage}
+                    className="w-full mt-5 bg-blue-500"
+                  >
+                    Enviar Mensaje
+                  </Button>
+                </DialogDescription>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -296,6 +673,7 @@ const Home = () => {
               <div className="flex w-full flex-col gap-2">
                 <label className="w-full">Template Message</label>
                 <Textarea
+                  disabled={currentCampaign?.newCampaign === null}
                   id="template"
                   placeholder="Mensaje"
                   value={template}
@@ -311,13 +689,22 @@ const Home = () => {
                     </label>
                     <div className="flex items-center w-full gap-2">
                       <select
+                        onChange={(e) => setAccount(e.target.value)}
                         id="account-select"
                         className="w-full border rounded-md px-3 py-2"
                       >
-                        <option value="account1">Account 1</option>
-                        <option value="account2">Account 2</option>
+                        {availableAccounts.map((accountName) => (
+                          <option key={accountName} value={accountName}>
+                            {accountName}
+                          </option>
+                        ))}
                       </select>
-                      <PlusCircleIcon className="w-6 h-6 cursor-pointer" />{" "}
+                      <Popover>
+                        <PopoverTrigger>
+                          <Settings className="w-6 h-6 cursor-pointer" />
+                        </PopoverTrigger>
+                        <PopoverContent></PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                   <div className="flex items-center w-full gap-4">
@@ -326,6 +713,7 @@ const Home = () => {
                         Batch Size
                       </label>
                       <Input
+                        disabled={currentCampaign?.newCampaign === null}
                         id="batch-size"
                         type="number"
                         value={batchSize}
@@ -337,6 +725,7 @@ const Home = () => {
                         Timeout
                       </label>
                       <Input
+                        disabled={currentCampaign?.newCampaign === null}
                         id="timeout"
                         type="number"
                         value={timeout}
@@ -344,19 +733,41 @@ const Home = () => {
                       />
                     </div>
                   </div>
-                  <div className="flex w-full flex-col items-center">
-                    <label className="w-full" htmlFor="random-delay">
-                      Random Delay
-                    </label>
-                    <Input
-                      id="random-delay"
-                      type="text"
-                      placeholder="comma separated"
-                      value={randomDelay.join(",")}
-                      onChange={(e) =>
-                        setRandomDelay(e.target.value.split(",").map(Number))
-                      }
-                    />
+                  <div className="flex w-full gap-2 items-center">
+                    <div className="flex w-full flex-col gap-2">
+                      <label className="w-full" htmlFor="random-delay-min">
+                        Random Delay Min
+                      </label>
+                      <Input
+                        disabled={currentCampaign?.newCampaign === null}
+                        id="random-delay-min"
+                        type="number"
+                        value={randomDelay[0]}
+                        onChange={(e) =>
+                          setRandomDelay([
+                            Number(e.target.value),
+                            randomDelay[1],
+                          ])
+                        }
+                      />
+                    </div>
+                    <div className="flex w-full flex-col gap-2">
+                      <label className="w-full" htmlFor="random-delay-max">
+                        Random Delay Max
+                      </label>
+                      <Input
+                        disabled={currentCampaign?.newCampaign === null}
+                        id="random-delay-max"
+                        type="number"
+                        value={randomDelay[1]}
+                        onChange={(e) =>
+                          setRandomDelay([
+                            randomDelay[0],
+                            Number(e.target.value),
+                          ])
+                        }
+                      />
+                    </div>
                   </div>
 
                   <div className="flex w-full flex-col gap-2">
@@ -364,7 +775,8 @@ const Home = () => {
                       Date and Time
                     </label>
                     <DatePicker
-                      selected={datetime ? new Date(datetime) : null}
+                      disabled={currentCampaign?.newCampaign === null}
+                      selected={datetime ? new Date(datetime) : new Date()}
                       onChange={handleChange}
                       showTimeSelect
                       dateFormat="Pp"
@@ -377,6 +789,7 @@ const Home = () => {
                       Image URL
                     </label>
                     <Input
+                      disabled={currentCampaign?.newCampaign === null}
                       id="image-url"
                       type="text"
                       placeholder="Image URL"
@@ -387,24 +800,30 @@ const Home = () => {
                 </div>
                 <button
                   disabled={
+                    currentCampaign?.newCampaign === null ||
                     template === "" ||
                     batchSize === 0 ||
                     timeout === 0 ||
                     !randomDelay ||
-                    datetime === null
+                    datetime === null ||
+                    contacts.length === 0
                   }
                   className={`w-full font-bold text-[19px] mt-4 text-white ${
                     template === "" ||
+                    currentCampaign?.newCampaign === null ||
                     batchSize === 0 ||
                     timeout === 0 ||
                     !randomDelay ||
+                    contacts.length === 0 ||
                     datetime === null
                       ? "bg-gray-300 cursor-not-allowed"
                       : "bg-blue-500 hover:bg-blue-600 focus:ring-4 focus:outline-none focus:ring-blue-300"
                   } font-medium rounded-lg text-sm px-5 py-2.5 text-center`}
                   onClick={sendJson}
                 >
-                  Programar Campaña
+                  {currentCampaign?.newCampaign === null
+                    ? "Campaign alreadyScheduled or Running"
+                    : "Create Campaign"}
                 </button>
               </div>
             </div>
@@ -468,12 +887,15 @@ const Home = () => {
                   Enviando mensajes desde
                   {"   "}({currentCampaign?.account})
                 </h2>
-                <button className="px-4 py-2 bg-red-500 text-white font-bold rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300 w-1/2 mx-auto">
-                  Detener Envios
+                <button
+                  onClick={stopCampaign}
+                  className="px-4 py-2 bg-red-500 text-white font-bold rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300 w-1/2 mx-auto"
+                >
+                  Cancelar/Detener Campaña
                 </button>
                 <hr className="w-full border-gray-300 my-2" />
 
-                <Progress value={loader} color="blue" />
+                <Progress value={progress ? loader : 0} color="blue" />
                 <div className="w-full h-[15px] flex items-center justify-center">
                   <p className="text-sm text-gray-500">
                     {message ? `Mensaje enviado a ${message.phone}` : ""}
@@ -511,21 +933,37 @@ const Home = () => {
                       document.getElementById("file-upload") as HTMLInputElement
                     ).value = "";
                   }}
-                  className="w-5 h-5"
+                  className="w-5 h-5 cursor-pointer hover:text-red-500 transition-colors"
                 />
-                <label
-                  htmlFor="file-upload"
-                  className="flex items-center justify-center cursor-pointer bg-blue-500 text-white p-2 rounded-lg shadow-lg hover:bg-blue-600 transition-colors"
-                >
-                  <Upload className="w-5 h-5" />
-                </label>
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCSVUpload}
-                  style={{ display: "none" }}
-                />
+                <div className="flex gap-2 items-center">
+                  <label
+                    htmlFor="file-upload"
+                    className="flex items-center justify-center cursor-pointer bg-blue-500 text-white p-2 rounded-lg shadow-lg hover:bg-blue-600 transition-colors"
+                  >
+                    <Upload className="w-5 h-5" />
+                  </label>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCSVUpload}
+                    style={{ display: "none" }}
+                  />
+                  <Popover>
+                    <PopoverTrigger className="flex items-center justify-center cursor-pointer bg-blue-500 text-white p-2 rounded-lg shadow-lg hover:bg-blue-600 transition-colors">
+                      <Copy className="w-5 h-5" />
+                    </PopoverTrigger>
+                    <PopoverContent>
+                      {" "}
+                      <textarea
+                        className="w-full h-40 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Pega aquí los datos CSV..."
+                        onChange={handleCSVInput}
+                        rows={6}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
 
               <div className="w-full h-full overflow-y-auto">
@@ -540,7 +978,9 @@ const Home = () => {
                     {contactsTable.map((contact, index) => (
                       <tr
                         key={index}
-                        className={contact.sent ? "bg-green-100" : ""}
+                        className={
+                          index < progress?.current ? "bg-green-100" : ""
+                        }
                         style={{ border: "1px solid #ddd" }}
                       >
                         <td style={{ padding: "8px" }}>{contact.name}</td>

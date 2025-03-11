@@ -14,6 +14,14 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const socketIo = require("socket.io");
 
+const fs = require("fs-extra");
+const path = require("path");
+const { createClient } = require("@supabase/supabase-js");
+
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const app = express();
 const server = http.createServer(app);
 
@@ -35,7 +43,11 @@ const io = socketIo(server, {
   },
 });
 const PORT = process.env.PORT || 3001;
-const AUTH_DIRS = { dental_reviews: "dental_reviews" };
+//const AUTH_DIRS = {
+// dental_reviews: "dental_reviews",
+// dental_reviews2: "6145288262",
+//};
+const AUTH_DIRS = {};
 
 app.use(bodyParser.json());
 
@@ -208,7 +220,13 @@ async function processCampaign(campaignId) {
       campaigns[campaignId].status = "completed";
       console.log(`Campaign ${campaignId} completed.`);
       stopSock(account);
+      delete campaigns[campaignId];
+
       io.emit("campaignsStatus", "completed");
+      io.emit(
+        "campaigns",
+        Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
+      );
       return;
     }
 
@@ -259,6 +277,12 @@ async function processCampaign(campaignId) {
     } else {
       // Stop the sock after the last batch
       stopSock(account);
+      delete campaigns[campaignId];
+      io.emit("campaignsStatus", "completed");
+      io.emit(
+        "campaigns",
+        Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
+      );
     }
   };
 
@@ -273,10 +297,13 @@ function getRandomDelay([min, max]) {
 async function sendMessage(account, phone, message, image) {
   if (!sockets[account]) return;
   const jid = `${phone}@s.whatsapp.net`;
+
   const payload = image
     ? { image: { url: image }, caption: message }
     : { text: message };
-  await sockets[account].sendMessage(jid, payload);
+
+  await sockets[account].sendMessage(jid, payload, { linkPreview: false });
+
   io.emit("message-sent", { account, phone });
 }
 
@@ -307,8 +334,13 @@ app.post("/stop-campaign/:campaignId", (req, res) => {
 
   campaigns[campaignId].status = "stopped";
   stopSock(campaign.account);
+  delete campaigns[campaignId];
 
   io.emit("campaignsStatus", "stopped");
+  io.emit(
+    "campaigns",
+    Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
+  );
 
   res
     .status(200)
@@ -336,7 +368,8 @@ app.post("/send-message/:account", async (req, res) => {
     const payload = image
       ? { image: { url: image }, caption: message }
       : { text: message };
-    await sockets[account].sendMessage(jid, payload);
+    await sockets[account].sendMessage(jid, payload, { linkPreview: false });
+
     res.status(200).json({
       success: true,
       message: `Message sent successfully from ${account}.`,
@@ -373,6 +406,101 @@ app.post("/stop/:account", (req, res) => {
     io.emit("sessionDisconnected", account);
   } else {
     res.status(400).json({ error: `Session for ${account} is not running.` });
+  }
+});
+
+function getRootFolder(folder) {
+  return path.join(process.cwd(), folder);
+}
+
+async function downloadFolder(bucketName, folderPath) {
+  try {
+    if (!bucketName || !folderPath) {
+      return {
+        success: false,
+        message: "Bucket name and folder path are required.",
+      };
+    }
+
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .list(folderPath, { limit: 100 });
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      return {
+        success: false,
+        message: "No files found in the Supabase folder.",
+      };
+    }
+
+    const LOCAL_FOLDER = getRootFolder(folderPath);
+    await fs.ensureDir(LOCAL_FOLDER); // Ensure the folder exists
+
+    for (const file of data) {
+      const filePath = `${folderPath}/${file.name}`;
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from(bucketName)
+        .download(filePath);
+
+      if (downloadError) {
+        console.error(`Error downloading ${filePath}:`, downloadError);
+        continue;
+      }
+
+      const localFilePath = path.join(LOCAL_FOLDER, file.name);
+      await fs.writeFile(
+        localFilePath,
+        Buffer.from(await fileData.arrayBuffer())
+      );
+      console.log(`Downloaded ${filePath} to ${localFilePath}`);
+    }
+
+    return {
+      success: true,
+      message: "Folder downloaded successfully.",
+      path: LOCAL_FOLDER,
+    };
+  } catch (err) {
+    console.error("Error downloading folder:", err);
+    return { success: false, message: err.message };
+  }
+}
+
+// API Endpoint to trigger the download
+app.post("/download-auth", async (req, res) => {
+  const { bucket, folder } = req.body;
+  const result = await downloadFolder(bucket, folder);
+  res.json(result);
+});
+
+app.post("/list-folders", async (req, res) => {
+  const { bucket } = req.body;
+
+  try {
+    const { data, error } = await supabase.storage.from(bucket).list("", {
+      limit: 100,
+      offset: 0,
+    });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    // Extract unique folder names
+    const folders = [...new Set(data.map((file) => file.name.split("/")[0]))];
+
+    // Update AUTH_DIRS dynamically
+    folders.forEach((folder) => {
+      AUTH_DIRS[folder] = folder; // Set folder name as the key & value
+    });
+
+    console.log("Updated AUTH_DIRS:", AUTH_DIRS); // Debugging output
+
+    res.json({ folders, authDirs: AUTH_DIRS });
+  } catch (err) {
+    console.error("Error listing folders:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

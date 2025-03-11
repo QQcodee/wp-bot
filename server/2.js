@@ -29,7 +29,7 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const PORT = process.env.PORT || 3001;
-const AUTH_DIR = "dental_reviews"; // Directory for storing auth state
+const AUTH_DIR = "6145288262"; // Directory for storing auth state
 
 app.use(
   cors({
