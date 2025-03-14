@@ -171,6 +171,8 @@ app.post("/schedule-campaign/:account", async (req, res) => {
     imageUrl,
     status: "scheduled",
     scheduleTime,
+    progress: 0,
+    current: 0,
   };
 
   // Schedule the campaign messages at the specified time
@@ -216,17 +218,23 @@ async function processCampaign(campaignId) {
   // Function to process and send a batch of messages
   const sendBatchMessages = async () => {
     const batch = contacts.slice(index, index + batchSize);
-    if (batch.length === 0) {
-      campaigns[campaignId].status = "completed";
-      console.log(`Campaign ${campaignId} completed.`);
-      stopSock(account);
-      delete campaigns[campaignId];
 
-      io.emit("campaignsStatus", "completed");
-      io.emit(
-        "campaigns",
-        Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
-      );
+    if (batch.length === 0) {
+      if (campaigns[campaignId]) {
+        campaigns[campaignId].status = "completed";
+        console.log(`Campaign ${campaignId} completed.`);
+        stopSock(account);
+        delete campaigns[campaignId];
+
+        io.emit("campaignsStatus", { campaignId, status: "completed" });
+        io.emit(
+          "campaigns",
+          Object.entries(campaigns).map(([id, campaign]) => ({
+            id,
+            ...campaign,
+          }))
+        );
+      }
       return;
     }
 
@@ -236,6 +244,11 @@ async function processCampaign(campaignId) {
 
     let progress = 0;
     for (const contact of batch) {
+      if (!campaigns[campaignId]) {
+        console.log(`Campaign ${campaignId} was stopped. Exiting.`);
+        return;
+      }
+
       const personalizedMessage = template.replace(/\{name\}/g, contact.name);
       const personalizedImage = imageUrl
         ? imageUrl.replace(/\{name\}/g, contact.name)
@@ -253,11 +266,23 @@ async function processCampaign(campaignId) {
       );
 
       progress++;
-      io.emit("campaignsProgress", {
-        campaignId,
-        progress: (index + progress) / contacts.length,
-        current: index + progress,
-      });
+
+      if (campaigns[campaignId]) {
+        // Check again before updating progress
+        campaigns[campaignId].progress = (index + progress) / contacts.length;
+        campaigns[campaignId].current = index + progress;
+        io.emit("campaignsProgress", {
+          campaignId,
+          progress: campaigns[campaignId].progress,
+          current: campaigns[campaignId].current,
+          lastPhone: contact.phone,
+        });
+      } else {
+        console.log(
+          `Campaign ${campaignId} no longer exists. Stopping updates.`
+        );
+        return;
+      }
 
       await new Promise((r) => setTimeout(r, delay)); // Delay between sending each message
     }
@@ -272,17 +297,30 @@ async function processCampaign(campaignId) {
           timeout * 1000
         }ms delay`
       );
-      setTimeout(sendBatchMessages, timeout * 1000); // Delay between batches
-      io.emit("campaignsStatus", "waiting");
+      setTimeout(() => {
+        if (campaigns[campaignId]) {
+          sendBatchMessages();
+          io.emit("campaignsStatus", { campaignId, status: "waiting" });
+        } else {
+          console.log(
+            `Campaign ${campaignId} has been stopped. No further batches.`
+          );
+        }
+      }, timeout * 1000); // Delay between batches
     } else {
       // Stop the sock after the last batch
-      stopSock(account);
-      delete campaigns[campaignId];
-      io.emit("campaignsStatus", "completed");
-      io.emit(
-        "campaigns",
-        Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
-      );
+      if (campaigns[campaignId]) {
+        stopSock(account);
+        delete campaigns[campaignId];
+        io.emit("campaignsStatus", { campaignId, status: "completed" });
+        io.emit(
+          "campaigns",
+          Object.entries(campaigns).map(([id, campaign]) => ({
+            id,
+            ...campaign,
+          }))
+        );
+      }
     }
   };
 
@@ -304,7 +342,7 @@ async function sendMessage(account, phone, message, image) {
 
   await sockets[account].sendMessage(jid, payload, { linkPreview: false });
 
-  io.emit("message-sent", { account, phone });
+  //io.emit("message-sent", { account, phone });
 }
 
 // API to get campaign status
@@ -336,7 +374,7 @@ app.post("/stop-campaign/:campaignId", (req, res) => {
   stopSock(campaign.account);
   delete campaigns[campaignId];
 
-  io.emit("campaignsStatus", "stopped");
+  io.emit("campaignsStatus", { campaignId, status: "stopped" });
   io.emit(
     "campaigns",
     Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))

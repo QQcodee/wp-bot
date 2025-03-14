@@ -22,29 +22,35 @@ export const useSocket = () => {
       setCampaigns(data);
     });
 
-    newSocket.on("sessionConnected", (data) => {
-      console.log("Session connected:", data);
-      setSessionStatus({ status: "connected", account: data });
-    });
-
-    newSocket.on("sessionDisconnected", (data) => {
-      console.log("Session disconnected:", data);
-      setSessionStatus({ status: "disconnected", account: data });
-    });
-
     newSocket.on("campaignsStatus", (status) => {
       console.log("Campaign status:", status);
+      setCampaigns((prevCampaigns) =>
+        prevCampaigns.map((campaign) =>
+          campaign.id === status.campaignId
+            ? {
+                ...campaign,
+                status: status.status,
+              }
+            : campaign
+        )
+      );
       setCampaignStatus(status);
     });
 
-    newSocket.on("message-sent", (data) => {
-      console.log("Message sent:", data);
-      setMessage(data);
-    });
-
     newSocket.on("campaignsProgress", (data) => {
-      console.log("Campaign progress:", data);
-      setProgress(data);
+      console.log("Campaign progress updated:", data);
+      setCampaigns((prevCampaigns) =>
+        prevCampaigns.map((campaign) =>
+          campaign.id === data.campaignId
+            ? {
+                ...campaign,
+                progress: data.progress,
+                current: data.current,
+                lastPhone: data.lastPhone,
+              }
+            : campaign
+        )
+      );
     });
 
     setSocket(newSocket);
@@ -63,3 +69,23 @@ export const useSocket = () => {
     message,
   };
 };
+
+/*
+
+ newSocket.on("sessionConnected", (data) => {
+      console.log("Session connected:", data);
+      setSessionStatus({ status: "connected", account: data });
+    });
+
+    newSocket.on("sessionDisconnected", (data) => {
+      console.log("Session disconnected:", data);
+      setSessionStatus({ status: "disconnected", account: data });
+    });
+
+     newSocket.on("message-sent", (data) => {
+      console.log("Message sent:", data);
+      setMessage(data);
+    });
+
+
+    */

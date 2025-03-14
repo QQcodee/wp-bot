@@ -60,8 +60,7 @@ import { Button } from "@/components/ui/button";
 const API_BASE = "http://localhost:3001";
 
 const Home = () => {
-  const { campaigns, sessionStatus, campaignStatus, progress, message } =
-    useSocket();
+  const { campaigns } = useSocket();
 
   const [availableAccounts, setAvailableAccounts] = useState(["Buscando..."]);
 
@@ -97,6 +96,10 @@ const Home = () => {
     datetime: new Date(),
     imageUrl: "",
     newCampaign: true,
+    status: "No status",
+    progress: 0,
+    current: 0,
+    lastPhone: "5216143035198",
   });
 
   useEffect(() => {
@@ -144,9 +147,28 @@ const Home = () => {
     setAccount(currentCampaign.account);
   }, [currentCampaign]);
 
+  /*
   useEffect(() => {
     if (campaigns.length > 0) {
       setCurrentCampaign({ ...campaigns[0], newCampaign: null });
+    }
+  }, []);
+  */
+  useEffect(() => {
+    if (!currentCampaign || !campaigns.length) return;
+
+    const updatedCampaign = campaigns.find(
+      (campaign) => campaign.id === currentCampaign.id
+    );
+
+    if (
+      updatedCampaign &&
+      JSON.stringify(updatedCampaign) !== JSON.stringify(currentCampaign)
+    ) {
+      setCurrentCampaign((prev) => ({
+        ...prev,
+        ...updatedCampaign, // Update only available fields
+      }));
     }
   }, [campaigns]);
 
@@ -178,7 +200,7 @@ const Home = () => {
     }, interval);
 
     return () => clearInterval(timer); // Cleanup on unmount or message change
-  }, [message]);
+  }, [currentCampaign?.lastPhone]);
 
   const messages = [
     {
@@ -415,6 +437,10 @@ const Home = () => {
         imageUrl: "",
         newCampaign: true,
         id: null,
+        status: "creating...",
+
+        progress: 0,
+        current: 0,
       });
     } catch (error) {
       console.error("Error stopping campaign:", error);
@@ -423,13 +449,32 @@ const Home = () => {
 
   const handleSelectChange = (event) => {
     const selectedId = event.target.value;
-    const selectedCampaign = campaigns.find((c) => c.id === selectedId);
 
-    setCurrentCampaign({
-      ...selectedCampaign,
-      id: selectedId,
-      newCampaign: null,
-    });
+    if (selectedId === "") {
+      setCurrentCampaign({
+        batchSize: 50,
+        timeout: 120,
+        randomDelay: [20000, 35000],
+        account: "default",
+        template: "",
+        contacts: [],
+        datetime: new Date(),
+        imageUrl: "",
+        newCampaign: true,
+
+        status: "No status",
+        progress: 0,
+        current: 0,
+      });
+    } else {
+      const selectedCampaign = campaigns.find((c) => c.id === selectedId);
+
+      setCurrentCampaign({
+        ...selectedCampaign,
+        id: selectedId,
+        newCampaign: null,
+      });
+    }
   };
 
   const handleStartSocket = async () => {
@@ -512,7 +557,7 @@ const Home = () => {
                 onChange={handleSelectChange}
                 className="border border-gray-300 rounded-md px-2 py-1"
               >
-                <option value="">Select campaign</option>
+                <option value="">Select a campaign</option>
                 {campaigns.map((campaign) => (
                   <option key={campaign.id} value={campaign.id}>
                     {campaign.account} - {campaign.id}
@@ -532,6 +577,10 @@ const Home = () => {
                     imageUrl: "",
                     newCampaign: true,
                     id: null,
+                    status: "creating...",
+
+                    progress: 0,
+                    current: 0,
                   })
                 }
                 className="w-6 h-6 cursor-pointer text-green-500"
@@ -553,6 +602,10 @@ const Home = () => {
                     imageUrl: "",
                     newCampaign: true,
                     id: null,
+                    status: "creating...",
+
+                    progress: 0,
+                    current: 0,
                   })
                 }
                 className="w-6 h-6  cursor-pointer text-green-500"
@@ -689,6 +742,8 @@ const Home = () => {
                     </label>
                     <div className="flex items-center w-full gap-2">
                       <select
+                        disabled={currentCampaign?.newCampaign === null}
+                        value={account}
                         onChange={(e) => setAccount(e.target.value)}
                         id="account-select"
                         className="w-full border rounded-md px-3 py-2"
@@ -895,21 +950,29 @@ const Home = () => {
                 </button>
                 <hr className="w-full border-gray-300 my-2" />
 
-                <Progress value={progress ? loader : 0} color="blue" />
+                <Progress
+                  value={currentCampaign?.lastPhone ? loader : 0}
+                  color="blue"
+                />
                 <div className="w-full h-[15px] flex items-center justify-center">
                   <p className="text-sm text-gray-500">
-                    {message ? `Mensaje enviado a ${message.phone}` : ""}
+                    {currentCampaign.lastPhone
+                      ? `Mensaje enviado a ${currentCampaign.lastPhone}`
+                      : currentCampaign?.status}
                   </p>
                 </div>
               </div>
               <div className="flex flex-col gap-2">
                 <hr className="w-full border-gray-300 my-2" />
-                <Progress value={progress?.progress * 100 || 0} color="green" />
+                <Progress
+                  value={currentCampaign ? currentCampaign.progress * 100 : 0}
+                  color="green"
+                />
                 <div className="w-full h-[15px] flex items-center justify-center">
                   <p className="text-sm text-gray-500">
-                    {progress
-                      ? `${progress?.current}/${contacts.length}`
-                      : "No hay ninguna campaña activa"}
+                    {currentCampaign?.progress
+                      ? `${currentCampaign?.current}/${contacts.length}`
+                      : currentCampaign?.status}
                   </p>
                 </div>
               </div>
@@ -979,7 +1042,7 @@ const Home = () => {
                       <tr
                         key={index}
                         className={
-                          index < progress?.current ? "bg-green-100" : ""
+                          index < currentCampaign?.current ? "bg-green-100" : ""
                         }
                         style={{ border: "1px solid #ddd" }}
                       >
