@@ -1,0 +1,131 @@
+{
+  "messaging_product": "whatsapp",
+  "to": "526143035198",
+  "type": "template",
+  "template": {
+    "name": "dental_reviews",
+    "language": {
+      "code": "es_MX"
+    },
+    "components": [
+      {
+        "type": "header",
+        "parameters": [
+          {
+            "type": "image",
+            "image": {
+              "link": "https://img1.niftyimages.com/vmjh/k3t5/y4kp?name=Luis"
+            }
+          }
+        ]
+      },
+      {
+        "type": "body",
+        "parameters": [
+          {
+            "type": "text",
+            "paramter_name": "name",
+            "text": "Luis"
+          }
+        ]
+      },
+      {
+        "type": "button",
+        "sub_type": "url",
+        "index": "0",
+        "parameters": [
+          {
+            "type": "text",
+            "text": "test"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+{
+    "messaging_product": "whatsapp",
+    "to": "526143035198",  
+    "type": "template",
+    "template": {
+        "name": "hello_world",
+        "language": {
+            "code": "en_US"
+        }
+    }
+}
+
+{
+    "messaging_product": "whatsapp",
+    "to": "526143035198",
+    "type": "interactive",
+    "interactive": {
+      "type": "cta_url",
+      "header": {
+        "type": "text",
+        "text": "Dental Reviews"
+      },
+      "body": {
+        "text": "Thank you for your recent dental visit. We would appreciate your feedback!"
+      },
+      "footer": {
+        "text": "Your feedback helps us improve!"
+      },
+      "action": {
+        "name": "cta_url",
+        "parameters": {
+          "display_text": "Give Feedback",
+          "url": "https://example.com/review"
+        }
+      }
+    }
+  }
+  
+
+  {
+    "messaging_product": "whatsapp",
+    "to": "526143035198",
+    "type": "template",
+    "template": {
+      "name": "dental_reviews",
+      "language": {
+        "code": "es_MX"
+      },
+      "components": [
+        {
+          "type": "HEADER",
+          "format": "IMAGE",
+          "parameters": [
+            {
+              "type": "image",
+              "image": {
+                "link": "https://scontent.whatsapp.net/v/t61.29466-34/473403126_616718961260877_587424993892620295_n.png?ccb=1-7&_nc_sid=8b1bef&_nc_ohc=NOYSQKLhrDwQ7kNvgEpCJts&_nc_oc=AdkwEmhLh_087x1wOK5tt85IiFwIOnMFHivfaOLz0djx6HZORpFuPVeg_JuIMuY43x4&_nc_zt=3&_nc_ht=scontent.whatsapp.net&edm=AH51TzQEAAAA&_nc_gid=EsxqVUDhAOOAue6ofQz-hg&oh=01_Q5AaIcIswrmL04bA9LmSuTRfGrFDlikBBwyTy7nULaMTKxLS&oe=6803CE64"
+              }
+            }
+          ]
+        },
+        {
+          "type": "BODY",
+          "parameters": [
+            {
+              "type": "text",
+              "text": "¡Hola {{name}}! 😄 \n\n Espero que todo esté yendo de maravilla. \n\nSoy la Doctora Cristina Chao y quiero agradecerte por confiar en mi equipo y en mí para cuidar de tu sonrisa.😊 \n\n Me encantaría saber qué te ha parecido la atención que has recibido. Si tienes unos minutos, por favor déjanos tu reseña, ¡sería de gran ayuda!\n\n👇[Deja tu reseña aquí]👇"
+            }
+          ]
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "Dejar Reseña",
+              "url": "https://www.dentalreviews.com.mx/{{1}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+  

@@ -64,7 +64,7 @@ io.on("connection", (socket) => {
   console.log("a user connected");
   io.emit(
     "campaigns",
-    Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
+    Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign })),
   );
   socket.on("disconnect", () => {
     console.log("user disconnected");
@@ -86,6 +86,7 @@ const startSock = async (account) => {
   console.log(`Starting WhatsApp session for ${account}`);
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRS[account]);
   const sock = makeWASocket({ auth: state });
+
   sockets[account] = sock;
 
   sock.ev.on("connection.update", async (update) => {
@@ -105,12 +106,15 @@ const startSock = async (account) => {
       const reason = lastDisconnect?.error?.output?.statusCode;
       console.log(
         `WhatsApp session closed for ${account}:`,
-        DisconnectReason[reason] || reason
+        DisconnectReason[reason] || reason,
       );
+
+      sockets[account] = null; // Clear the session
 
       if (reason === DisconnectReason.loggedOut) {
         console.log(`Session logged out for ${account}.`);
-        sockets[account] = null;
+      } else {
+        console.log(`Session closed. No reconnection will be attempted.`);
       }
     }
   });
@@ -195,7 +199,7 @@ app.post("/schedule-campaign/:account", async (req, res) => {
 
   io.emit(
     "campaigns",
-    Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
+    Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign })),
   );
 });
 
@@ -232,14 +236,14 @@ async function processCampaign(campaignId) {
           Object.entries(campaigns).map(([id, campaign]) => ({
             id,
             ...campaign,
-          }))
+          })),
         );
       }
       return;
     }
 
     console.log(
-      `Campaign ${campaignId}: Sending batch of ${batch.length} messages`
+      `Campaign ${campaignId}: Sending batch of ${batch.length} messages`,
     );
 
     let progress = 0;
@@ -255,14 +259,14 @@ async function processCampaign(campaignId) {
         : null;
       const delay = getRandomDelay(randomDelay);
       console.log(
-        `Campaign ${campaignId}: Sending message to ${contact.phone} with ${delay}ms delay`
+        `Campaign ${campaignId}: Sending message to ${contact.phone} with ${delay}ms delay`,
       );
 
       await sendMessage(
         account,
         contact.phone,
         personalizedMessage,
-        personalizedImage
+        personalizedImage,
       );
 
       progress++;
@@ -279,7 +283,7 @@ async function processCampaign(campaignId) {
         });
       } else {
         console.log(
-          `Campaign ${campaignId} no longer exists. Stopping updates.`
+          `Campaign ${campaignId} no longer exists. Stopping updates.`,
         );
         return;
       }
@@ -295,7 +299,7 @@ async function processCampaign(campaignId) {
       console.log(
         `Campaign ${campaignId}: Waiting for next batch with ${
           timeout * 1000
-        }ms delay`
+        }ms delay`,
       );
       setTimeout(() => {
         if (campaigns[campaignId]) {
@@ -303,7 +307,7 @@ async function processCampaign(campaignId) {
           io.emit("campaignsStatus", { campaignId, status: "waiting" });
         } else {
           console.log(
-            `Campaign ${campaignId} has been stopped. No further batches.`
+            `Campaign ${campaignId} has been stopped. No further batches.`,
           );
         }
       }, timeout * 1000); // Delay between batches
@@ -318,7 +322,7 @@ async function processCampaign(campaignId) {
           Object.entries(campaigns).map(([id, campaign]) => ({
             id,
             ...campaign,
-          }))
+          })),
         );
       }
     }
@@ -377,7 +381,7 @@ app.post("/stop-campaign/:campaignId", (req, res) => {
   io.emit("campaignsStatus", { campaignId, status: "stopped" });
   io.emit(
     "campaigns",
-    Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign }))
+    Object.entries(campaigns).map(([id, campaign]) => ({ id, ...campaign })),
   );
 
   res
@@ -489,7 +493,7 @@ async function downloadFolder(bucketName, folderPath) {
       const localFilePath = path.join(LOCAL_FOLDER, file.name);
       await fs.writeFile(
         localFilePath,
-        Buffer.from(await fileData.arrayBuffer())
+        Buffer.from(await fileData.arrayBuffer()),
       );
       console.log(`Downloaded ${filePath} to ${localFilePath}`);
     }
@@ -541,6 +545,31 @@ app.post("/list-folders", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+async function listFoldersOnLoad(bucket) {
+  try {
+    const { data, error } = await supabase.storage.from(bucket).list("", {
+      limit: 100,
+      offset: 0,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const folders = [...new Set(data.map((file) => file.name.split("/")[0]))];
+
+    folders.forEach((folder) => {
+      AUTH_DIRS[folder] = folder;
+    });
+
+    console.log("Updated AUTH_DIRS:", AUTH_DIRS);
+  } catch (err) {
+    console.error("Error listing folders:", err.message);
+  }
+}
+const BUCKET_NAME = "whatsapp-sessions"; // Replace with your actual bucket name
+listFoldersOnLoad(BUCKET_NAME);
 
 // Start the server
 server.listen(PORT, () => {

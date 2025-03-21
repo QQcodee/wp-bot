@@ -137,7 +137,7 @@ const Home = () => {
     setDatetime(
       currentCampaign.scheduleTime
         ? new Date(currentCampaign.scheduleTime) // Ensure we use the correct key
-        : null // Use null instead of "" to clear the DatePicker properly
+        : null, // Use null instead of "" to clear the DatePicker properly
     );
 
     setImageUrl(currentCampaign.imageUrl);
@@ -158,7 +158,7 @@ const Home = () => {
     if (!currentCampaign || !campaigns.length) return;
 
     const updatedCampaign = campaigns.find(
-      (campaign) => campaign.id === currentCampaign.id
+      (campaign) => campaign.id === currentCampaign.id,
     );
 
     if (
@@ -278,7 +278,7 @@ const Home = () => {
             headers[1].toLowerCase() !== "phone"
           ) {
             toast.error(
-              "El archivo CSV debe tener las columnas 'name' y 'phone' en la primera fila."
+              "El archivo CSV debe tener las columnas 'name' y 'phone' en la primera fila.",
             );
             return;
           }
@@ -312,7 +312,7 @@ const Home = () => {
 
           setContacts(parsedContacts);
           setContactsTable(
-            parsedContacts.map((contact) => ({ ...contact, sent: false }))
+            parsedContacts.map((contact) => ({ ...contact, sent: false })),
           );
 
           toast.success("Lista de contactos cargada!");
@@ -377,13 +377,15 @@ const Home = () => {
 
     setContacts(parsedContacts);
     setContactsTable(
-      parsedContacts.map((contact) => ({ ...contact, sent: false }))
+      parsedContacts.map((contact) => ({ ...contact, sent: false })),
     );
 
     toast.success("Lista de contactos cargada!");
   };
+  const [isLoading, setIsLoading] = useState(false);
 
   const sendJson = async () => {
+    setIsLoading(true);
     const jsonData = buildJson();
     try {
       const response = await fetch(
@@ -394,13 +396,29 @@ const Home = () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(jsonData),
-        }
+        },
       );
       const result = await response.json();
       console.log("Response:", result);
     } catch (error) {
       console.error("Error:", error);
     }
+    setCurrentCampaign({
+      batchSize: 50,
+      timeout: 120,
+      randomDelay: [20000, 35000],
+      account: "default",
+      template: template ? template : "",
+      contacts: [],
+      datetime: new Date(),
+      imageUrl: "",
+      newCampaign: true,
+      status: "No status",
+      progress: 0,
+      current: 0,
+      lastPhone: "5216143035198",
+    });
+    setIsLoading(false);
   };
 
   const stopCampaign = async () => {
@@ -417,7 +435,7 @@ const Home = () => {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -483,7 +501,7 @@ const Home = () => {
         `http://localhost:3001/start/${testAccount}`,
         {
           method: "POST",
-        }
+        },
       );
       const result = await response.json();
       if (response.ok) {
@@ -502,7 +520,7 @@ const Home = () => {
         `http://localhost:3001/stop/${testAccount}`,
         {
           method: "POST",
-        }
+        },
       );
       const result = await response.json();
       if (response.ok) {
@@ -527,9 +545,9 @@ const Home = () => {
           body: JSON.stringify({
             phone: testNumber,
             message: testMessage,
-            image: "",
+            image: testImgUrl || "",
           }),
-        }
+        },
       );
       const result = await response.json();
       if (response.ok) {
@@ -543,11 +561,11 @@ const Home = () => {
   };
 
   return (
-    <div className="w-screen h-screen max-h-screen p-5 flex flex-col overflow-hidden">
+    <div className="flex h-screen max-h-screen w-screen flex-col overflow-hidden p-5">
       {/* Header with fixed height */}
       <ToastContainer />
-      <div className="h-16 w-full flex items-center gap-5 justify-between">
-        <div className="flex gap-5 items-center">
+      <div className="flex h-16 w-full items-center justify-between gap-5">
+        <div className="flex items-center gap-5">
           <h1 className="m-0">QQs Chat Bot</h1>
           {campaigns.length > 0 ? (
             <>
@@ -555,7 +573,7 @@ const Home = () => {
               <select
                 value={currentCampaign?.id || ""}
                 onChange={handleSelectChange}
-                className="border border-gray-300 rounded-md px-2 py-1"
+                className="rounded-md border border-gray-300 px-2 py-1"
               >
                 <option value="">Select a campaign</option>
                 {campaigns.map((campaign) => (
@@ -583,7 +601,7 @@ const Home = () => {
                     current: 0,
                   })
                 }
-                className="w-6 h-6 cursor-pointer text-green-500"
+                className="h-6 w-6 cursor-pointer text-green-500"
               />
             </>
           ) : (
@@ -608,7 +626,7 @@ const Home = () => {
                     current: 0,
                   })
                 }
-                className="w-6 h-6  cursor-pointer text-green-500"
+                className="h-6 w-6 cursor-pointer text-green-500"
               />
             </>
           )}
@@ -617,8 +635,8 @@ const Home = () => {
           <Dialog>
             <DialogTrigger>
               {" "}
-              <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded">
-                <Send className="w-6 h-6" /> Enviar Mensaje de Prueba
+              <button className="flex items-center gap-2 rounded bg-blue-500 px-4 py-2 text-white">
+                <Send className="h-6 w-6" /> Enviar Mensaje de Prueba
               </button>
             </DialogTrigger>
             <DialogContent className="p-10">
@@ -636,7 +654,7 @@ const Home = () => {
                       value={testAccount}
                       onChange={(e) => setTestAccount(e.target.value)}
                       id="account-select"
-                      className="w-full border rounded-md px-3 py-2"
+                      className="w-full rounded-md border px-3 py-2"
                     >
                       {availableAccounts.map((accountName) => (
                         <option key={accountName} value={accountName}>
@@ -645,10 +663,10 @@ const Home = () => {
                       ))}
                     </select>
                   </div>
-                  <div className=" hidden flex justify-between items-center">
+                  <div className="flex hidden items-center justify-between">
                     {" "}
                     <span>Socket Status</span>
-                    <Switch className="transform scale-[1.2]" />{" "}
+                    <Switch className="scale-[1.2] transform" />{" "}
                   </div>
                   <div className="flex flex-col">
                     {" "}
@@ -657,7 +675,7 @@ const Home = () => {
                       value={testAccount}
                       onChange={(e) => setTestAccount(e.target.value)}
                       id="account-select"
-                      className="w-full border rounded-md px-3 py-2"
+                      className="w-full rounded-md border px-3 py-2"
                     >
                       {availableAccounts.map((accountName) => (
                         <option key={accountName} value={accountName}>
@@ -665,16 +683,16 @@ const Home = () => {
                         </option>
                       ))}
                     </select>
-                    <div className="flex justify-between items-center gap-2 mt-2">
+                    <div className="mt-2 flex items-center justify-between gap-2">
                       <button
                         onClick={handleStartSocket}
-                        className="w-full bg-blue-500 text-white px-4 py-2"
+                        className="w-full bg-blue-500 px-4 py-2 text-white"
                       >
                         Iniciar
                       </button>
                       <button
                         onClick={handleStopSocket}
-                        className="w-full bg-red-500 text-white px-4 py-2"
+                        className="w-full bg-red-500 px-4 py-2 text-white"
                       >
                         Detener
                       </button>
@@ -706,7 +724,7 @@ const Home = () => {
                   </div>
                   <Button
                     onClick={handleSendTestMessage}
-                    className="w-full mt-5 bg-blue-500"
+                    className="mt-5 w-full bg-blue-500"
                   >
                     Enviar Mensaje
                   </Button>
@@ -718,11 +736,11 @@ const Home = () => {
       </div>
 
       {/* Grid should take remaining space */}
-      <div className="w-full flex-1 grid grid-cols-3 gap-5 overflow-hidden">
+      <div className="grid w-full flex-1 grid-cols-3 gap-5 overflow-hidden">
         {/* First Column */}
         <div className="max-h-screen overflow-auto">
-          <div className="w-full h-full p-4">
-            <div className="flex flex-col w-full h-full bg-white border rounded-lg shadow-lg py-4 px-4 justify-between max-h-screen overflow-auto">
+          <div className="h-full w-full p-4">
+            <div className="flex h-full max-h-screen w-full flex-col justify-between overflow-auto rounded-lg border bg-white px-4 py-4 shadow-lg">
               <div className="flex w-full flex-col gap-2">
                 <label className="w-full">Template Message</label>
                 <Textarea
@@ -731,22 +749,22 @@ const Home = () => {
                   placeholder="Mensaje"
                   value={template}
                   onChange={(e) => setTemplate(e.target.value)}
-                  className="w-full h-32"
+                  className="h-32 w-full"
                 />
               </div>
-              <div className="flex-1 flex flex-col justify-end items-center overflow-auto">
-                <div className="p-4 space-y-4 flex flex-col items-center w-full">
+              <div className="flex flex-1 flex-col items-center justify-end overflow-auto">
+                <div className="flex w-full flex-col items-center space-y-4 p-4">
                   <div className="flex w-full flex-col gap-2">
                     <label className="w-full" htmlFor="batch-size">
                       Account
                     </label>
-                    <div className="flex items-center w-full gap-2">
+                    <div className="flex w-full items-center gap-2">
                       <select
                         disabled={currentCampaign?.newCampaign === null}
                         value={account}
                         onChange={(e) => setAccount(e.target.value)}
                         id="account-select"
-                        className="w-full border rounded-md px-3 py-2"
+                        className="w-full rounded-md border px-3 py-2"
                       >
                         {availableAccounts.map((accountName) => (
                           <option key={accountName} value={accountName}>
@@ -756,13 +774,13 @@ const Home = () => {
                       </select>
                       <Popover>
                         <PopoverTrigger>
-                          <Settings className="w-6 h-6 cursor-pointer" />
+                          <Settings className="h-6 w-6 cursor-pointer" />
                         </PopoverTrigger>
                         <PopoverContent></PopoverContent>
                       </Popover>
                     </div>
                   </div>
-                  <div className="flex items-center w-full gap-4">
+                  <div className="flex w-full items-center gap-4">
                     <div className="flex w-full flex-col gap-2">
                       <label className="w-full" htmlFor="batch-size">
                         Batch Size
@@ -788,7 +806,7 @@ const Home = () => {
                       />
                     </div>
                   </div>
-                  <div className="flex w-full gap-2 items-center">
+                  <div className="flex w-full items-center gap-2">
                     <div className="flex w-full flex-col gap-2">
                       <label className="w-full" htmlFor="random-delay-min">
                         Random Delay Min
@@ -836,7 +854,7 @@ const Home = () => {
                       showTimeSelect
                       dateFormat="Pp"
                       timeIntervals={1}
-                      className="w-full border border-gray-300 rounded-md p-2"
+                      className="w-full rounded-md border border-gray-300 p-2"
                     />
                   </div>
                   <div className="flex w-full flex-col gap-2">
@@ -863,7 +881,7 @@ const Home = () => {
                     datetime === null ||
                     contacts.length === 0
                   }
-                  className={`w-full font-bold text-[19px] mt-4 text-white ${
+                  className={`mt-4 w-full text-[19px] font-bold text-white ${
                     template === "" ||
                     currentCampaign?.newCampaign === null ||
                     batchSize === 0 ||
@@ -871,9 +889,9 @@ const Home = () => {
                     !randomDelay ||
                     contacts.length === 0 ||
                     datetime === null
-                      ? "bg-gray-300 cursor-not-allowed"
-                      : "bg-blue-500 hover:bg-blue-600 focus:ring-4 focus:outline-none focus:ring-blue-300"
-                  } font-medium rounded-lg text-sm px-5 py-2.5 text-center`}
+                      ? "cursor-not-allowed bg-gray-300"
+                      : "bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                  } rounded-lg px-5 py-2.5 text-center text-sm font-medium`}
                   onClick={sendJson}
                 >
                   {currentCampaign?.newCampaign === null
@@ -886,21 +904,21 @@ const Home = () => {
         </div>
 
         {/* Second Column (Chat Section) */}
-        <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex h-full flex-col overflow-hidden">
           {/* Chat Section (3/4 height) */}
-          <div className="w-full flex-1 max-h-[75vh] flex flex-col p-4 overflow-hidden">
-            <div className="flex flex-col h-full w-full bg-white border rounded-lg shadow-lg">
+          <div className="flex max-h-[75vh] w-full flex-1 flex-col overflow-hidden p-4">
+            <div className="flex h-full w-full flex-col rounded-lg border bg-white shadow-lg">
               {/* Header */}
-              <div className="flex items-center p-4 border-b">
-                <div className="w-10 h-10 bg-green-500 rounded-full"></div>
+              <div className="flex items-center border-b p-4">
+                <div className="h-10 w-10 rounded-full bg-green-500"></div>
                 <div className="ml-3">
-                  <h2 className="font-semibold text-lg">Consultorio Dental</h2>
+                  <h2 className="text-lg font-semibold">Consultorio Dental</h2>
                   <p className="text-sm text-gray-500">En Línea</p>
                 </div>
               </div>
 
               {/* Messages (Fix Overflow) */}
-              <div className="flex-1 min-h-0 p-4 space-y-4 overflow-y-auto">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
                 {messages.map((msg, index) => (
                   <div
                     key={index}
@@ -909,7 +927,7 @@ const Home = () => {
                     }`}
                   >
                     <div
-                      className={`max-w-xs p-3 rounded-lg flex flex-col border ${
+                      className={`flex max-w-xs flex-col rounded-lg border p-3 ${
                         msg.isUser
                           ? "bg-green-100 text-green-900"
                           : "bg-gray-100 text-gray-900"
@@ -920,11 +938,11 @@ const Home = () => {
                         <img
                           src={msg.image}
                           alt="Attached"
-                          className="mt-2 rounded-lg mb-2"
+                          className="mb-2 mt-2 rounded-lg"
                         />
                       )}
                       <p className="text-sm">{msg.message}</p>
-                      <span className="text-xs text-gray-500 w-full text-right">
+                      <span className="w-full text-right text-xs text-gray-500">
                         {msg.time}
                       </span>
                     </div>
@@ -935,8 +953,8 @@ const Home = () => {
           </div>
 
           {/* Input Section (1/4 height) */}
-          <div className="w-full flex-shrink-0 h-[25vh] p-4">
-            <div className="flex flex-col h-full w-full bg-white border rounded-lg shadow-lg p-4 justify-between gap-2">
+          <div className="h-[25vh] w-full flex-shrink-0 p-4">
+            <div className="flex h-full w-full flex-col justify-between gap-2 rounded-lg border bg-white p-4 shadow-lg">
               <div className="flex flex-col gap-2">
                 <h2 className="text-center">
                   Enviando mensajes desde
@@ -944,17 +962,17 @@ const Home = () => {
                 </h2>
                 <button
                   onClick={stopCampaign}
-                  className="px-4 py-2 bg-red-500 text-white font-bold rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300 w-1/2 mx-auto"
+                  className="mx-auto w-1/2 rounded bg-red-500 px-4 py-2 font-bold text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300"
                 >
                   Cancelar/Detener Campaña
                 </button>
-                <hr className="w-full border-gray-300 my-2" />
+                <hr className="my-2 w-full border-gray-300" />
 
                 <Progress
                   value={currentCampaign?.lastPhone ? loader : 0}
                   color="blue"
                 />
-                <div className="w-full h-[15px] flex items-center justify-center">
+                <div className="flex h-[15px] w-full items-center justify-center">
                   <p className="text-sm text-gray-500">
                     {currentCampaign.lastPhone
                       ? `Mensaje enviado a ${currentCampaign.lastPhone}`
@@ -963,12 +981,12 @@ const Home = () => {
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                <hr className="w-full border-gray-300 my-2" />
+                <hr className="my-2 w-full border-gray-300" />
                 <Progress
                   value={currentCampaign ? currentCampaign.progress * 100 : 0}
                   color="green"
                 />
-                <div className="w-full h-[15px] flex items-center justify-center">
+                <div className="flex h-[15px] w-full items-center justify-center">
                   <p className="text-sm text-gray-500">
                     {currentCampaign?.progress
                       ? `${currentCampaign?.current}/${contacts.length}`
@@ -982,10 +1000,10 @@ const Home = () => {
 
         {/* Third Column (Contacts Table) */}
         <div className="h-full overflow-hidden">
-          <div className="w-full h-full flex flex-col p-4">
-            <div className="flex flex-col h-full gap-4 w-full bg-white border rounded-lg shadow-lg p-4">
+          <div className="flex h-full w-full flex-col p-4">
+            <div className="flex h-full w-full flex-col gap-4 rounded-lg border bg-white p-4 shadow-lg">
               <div className="flex items-center justify-between">
-                <p className="font-semibold text-lg">
+                <p className="text-lg font-semibold">
                   Contactos {contacts.length > 0 && `(${contacts.length})`}
                 </p>
                 <Trash
@@ -996,14 +1014,14 @@ const Home = () => {
                       document.getElementById("file-upload") as HTMLInputElement
                     ).value = "";
                   }}
-                  className="w-5 h-5 cursor-pointer hover:text-red-500 transition-colors"
+                  className="h-5 w-5 cursor-pointer transition-colors hover:text-red-500"
                 />
-                <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-2">
                   <label
                     htmlFor="file-upload"
-                    className="flex items-center justify-center cursor-pointer bg-blue-500 text-white p-2 rounded-lg shadow-lg hover:bg-blue-600 transition-colors"
+                    className="flex cursor-pointer items-center justify-center rounded-lg bg-blue-500 p-2 text-white shadow-lg transition-colors hover:bg-blue-600"
                   >
-                    <Upload className="w-5 h-5" />
+                    <Upload className="h-5 w-5" />
                   </label>
                   <input
                     id="file-upload"
@@ -1012,14 +1030,15 @@ const Home = () => {
                     onChange={handleCSVUpload}
                     style={{ display: "none" }}
                   />
+
                   <Popover>
-                    <PopoverTrigger className="flex items-center justify-center cursor-pointer bg-blue-500 text-white p-2 rounded-lg shadow-lg hover:bg-blue-600 transition-colors">
-                      <Copy className="w-5 h-5" />
+                    <PopoverTrigger className="flex cursor-pointer items-center justify-center rounded-lg bg-blue-500 p-2 text-white shadow-lg transition-colors hover:bg-blue-600">
+                      <Copy className="h-5 w-5" />
                     </PopoverTrigger>
                     <PopoverContent>
                       {" "}
-                      <textarea
-                        className="w-full h-40 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      <Textarea
+                        className="h-40 w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Pega aquí los datos CSV..."
                         onChange={handleCSVInput}
                         rows={6}
@@ -1029,12 +1048,12 @@ const Home = () => {
                 </div>
               </div>
 
-              <div className="w-full h-full overflow-y-auto">
-                <table className="w-full h-full overflow-y-auto">
-                  <thead className="bg-gray-100 text-gray-600 text-left rounded-t">
+              <div className="h-full w-full overflow-y-auto">
+                <table className="h-full w-full overflow-y-auto">
+                  <thead className="rounded-t bg-gray-100 text-left text-gray-600">
                     <tr>
-                      <th className="py-2 px-4">Nombre</th>
-                      <th className="py-2 px-4">Teléfono</th>
+                      <th className="px-4 py-2">Nombre</th>
+                      <th className="px-4 py-2">Teléfono</th>
                     </tr>
                   </thead>
                   <tbody>

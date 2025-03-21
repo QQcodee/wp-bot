@@ -36,7 +36,7 @@ app.use(
     origin: "http://localhost:3000",
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type"],
-  })
+  }),
 );
 app.use(bodyParser.json());
 
@@ -69,7 +69,7 @@ const startSock = async () => {
       const reason = lastDisconnect?.error?.output?.statusCode;
       console.log(
         "WhatsApp session closed:",
-        DisconnectReason[reason] || reason
+        DisconnectReason[reason] || reason,
       );
 
       if (reason === DisconnectReason.loggedOut) {
@@ -196,7 +196,7 @@ app.post("/send-messages", async (req, res) => {
   try {
     cancelSending = false; // Reset the cancel flag before starting
     const delays = uploadedContacts.map(
-      () => Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay
+      () => Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay,
     );
 
     currentMessage = message;
