@@ -6,8 +6,9 @@ const SOCKET_SERVER_URL = "http://localhost:3001"; // Replace with your backend 
 export const useSocket = () => {
   const [socket, setSocket] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
-  const [sessionStatus, setSessionStatus] = useState(null);
   const [campaignStatus, setCampaignStatus] = useState(null);
+
+  const [sessionStatus, setSessionStatus] = useState(null);
   const [progress, setProgress] = useState(null);
   const [message, setMessage] = useState(null);
 
@@ -31,8 +32,8 @@ export const useSocket = () => {
                 ...campaign,
                 status: status.status,
               }
-            : campaign
-        )
+            : campaign,
+        ),
       );
       setCampaignStatus(status);
     });
@@ -48,8 +49,8 @@ export const useSocket = () => {
                 current: data.current,
                 lastPhone: data.lastPhone,
               }
-            : campaign
-        )
+            : campaign,
+        ),
       );
     });
 

@@ -52,7 +52,7 @@ import { Switch } from "@/components/ui/switch";
 
 import TiptapEditor from "@/components/TipTap";
 
-import supabase from "@/config/supabaseClient";
+import supabase from "@/config/supaBaseRaffly";
 import { Textarea } from "@/components/ui/textarea";
 import { useSocket } from "@/hooks/use-socket";
 import { Button } from "@/components/ui/button";
@@ -376,6 +376,7 @@ const Home = () => {
     }
 
     setContacts(parsedContacts);
+    console.log("Parsed contacts:", parsedContacts);
     setContactsTable(
       parsedContacts.map((contact) => ({ ...contact, sent: false })),
     );
@@ -953,7 +954,7 @@ const Home = () => {
           </div>
 
           {/* Input Section (1/4 height) */}
-          <div className="h-[25vh] w-full flex-shrink-0 p-4">
+          <div className="min-h-25vh h-[25vh] w-full flex-shrink-0 p-4">
             <div className="flex h-full w-full flex-col justify-between gap-2 rounded-lg border bg-white p-4 shadow-lg">
               <div className="flex flex-col gap-2">
                 <h2 className="text-center">

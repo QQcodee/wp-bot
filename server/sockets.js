@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+const sharp = require("sharp");
 const express = require("express");
 const http = require("http");
 const { v4: uuidv4 } = require("uuid");
@@ -166,6 +166,7 @@ app.post("/schedule-campaign/:account", async (req, res) => {
 
   const campaignId = uuidv4();
   campaigns[campaignId] = {
+    id: campaignId,
     account,
     batchSize,
     timeout,
@@ -348,6 +349,31 @@ async function sendMessage(account, phone, message, image) {
 
   //io.emit("message-sent", { account, phone });
 }
+
+/*
+async function sendMessage(account, phone, message, image) {
+  if (!sockets[account]) return;
+
+  const jid = `${phone}@s.whatsapp.net`;
+
+  // Check if the phone number is registered on WhatsApp
+  const isRegistered = await sockets[account].onWhatsApp(phone);
+
+  if (!isRegistered || isRegistered.length === 0) {
+    console.log(`The phone number ${phone} is not registered on WhatsApp.`);
+    return;
+  }
+
+  const payload = image
+    ? { image: { url: image }, caption: message }
+    : { text: message };
+
+  await sockets[account].sendMessage(jid, payload, { linkPreview: false });
+
+  console.log(`Message sent to ${phone}`);
+}
+
+*/
 
 // API to get campaign status
 app.get("/campaign-status/:campaignId", (req, res) => {
