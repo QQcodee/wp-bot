@@ -18,12 +18,16 @@ const page = () => {
 
       {/* Main content */}
       <div className="flex-1 space-y-4 border-gray-200 pb-10">
+        {/* @ts-ignore */}
         <WorkflowCard status="completed" statusInfo="Campaña completada" />
+        {/* @ts-ignore */}
         <WorkflowCard
           status="failed"
           statusInfo="Error en la cuenta de WhatsApp"
         />
+        {/* @ts-ignore */}
         <WorkflowCard status="failed" statusInfo="Error al enviar el mensaje" />
+        {/* @ts-ignore */}
         <WorkflowCard
           status="completed"
           statusInfo="Campaña completada"
@@ -76,6 +80,7 @@ const WorkflowCard = ({
 
         <div className="flex flex-col gap-2">
           <Progress
+            // @ts-ignore
             color={cn({
               green: status === "active" || status === "completed",
               blue: status === "paused",

@@ -56,7 +56,7 @@ const page = () => {
         webhookUrl: webhookUrl,
       });
       toast.success(response.data.message);
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.response?.data?.error);
     }
   };
@@ -65,7 +65,7 @@ const page = () => {
     try {
       const response = await axios.post(`${url}/stop/${testAccount}`, {});
       toast.success(response.data.message);
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.response?.data?.error);
     }
   };
@@ -107,7 +107,7 @@ const page = () => {
 
       {/* Main content */}
       <div className="flex-1 space-y-4 border-gray-200 pb-10">
-        {sockets?.map((socket) => (
+        {sockets?.map((socket: any) => (
           <WebhookCard
             key={socket}
             status={"active"}

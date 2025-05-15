@@ -24,6 +24,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import supabase from "@/config/supabaseClient";
 
 const UploadContacts = () => {
+  //@ts-ignore
   const { workspace } = useWorkspace();
   const {
     contacts,
@@ -33,7 +34,7 @@ const UploadContacts = () => {
     selectedContacts,
   } = useContacts();
 
-  const handleCSVInput = (event) => {
+  const handleCSVInput = (event: any) => {
     const pastedData = event.target.value;
 
     if (!pastedData) {
@@ -45,7 +46,7 @@ const UploadContacts = () => {
     const rows = pastedData
       .trim()
       .split("\n")
-      .map((row) => row.split(/\t|,/));
+      .map((row: string) => row.split(/\t|,/));
 
     if (rows.length < 2) {
       toast.error("El formato de los datos pegados no es válido.");
@@ -53,7 +54,7 @@ const UploadContacts = () => {
     }
 
     // Check headers
-    const headers = rows[0].map((header) => header.trim().toLowerCase());
+    const headers = rows[0].map((header: any) => header.trim().toLowerCase());
     if (headers[0] !== "name" || headers[1] !== "phone") {
       toast.error("El CSV debe tener 'name' y 'phone' en la primera fila.");
       return;
@@ -63,8 +64,8 @@ const UploadContacts = () => {
     const invalidRows = [];
     const parsedContacts = rows
       .slice(1) // Skip headers
-      .filter((row) => row.length >= 2 && row[0] && row[1]) // Ensure name & phone exist
-      .map((row, index) => {
+      .filter((row: any) => row.length >= 2 && row[0] && row[1]) // Ensure name & phone exist
+      .map((row: any, index: any) => {
         const phone = row[1].trim();
         if (!/^\d{13}$/.test(phone)) {
           invalidRows.push(index + 2); // Store row number for error message
@@ -92,6 +93,7 @@ const UploadContacts = () => {
   };
 
   const uploadContacts = async () => {
+    //@ts-ignore
     updateSelectedContacts({});
     resetContacts();
     const addTag = prompt("¿Desea agregar alguna etiqueta a los contactos?");

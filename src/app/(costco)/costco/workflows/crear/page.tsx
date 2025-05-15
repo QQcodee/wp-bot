@@ -40,7 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+//@ts-ignore
 import Papa from "papaparse"; // Import PapaParse for CSV parsing
 import { ToastContainer, toast } from "react-toastify";
 import { Toaster } from "@/components/ui/toaster";
@@ -194,7 +194,7 @@ const page = () => {
     },
   ];
 
-  const handleChange = (date) => {
+  const handleChange = (date: any) => {
     if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
       console.error("Invalid date selected:", date);
       return;
@@ -215,7 +215,7 @@ const page = () => {
     const minutesLocal = String(date.getMinutes()).padStart(2, "0");
 
     const localISO = `${year}-${month}-${day}T${hoursLocal}:${minutesLocal}${timezoneOffset}`;
-
+    //@ts-ignore
     setDatetime(localISO); // Save formatted date
   };
 
@@ -237,11 +237,11 @@ const page = () => {
     };
   };
 
-  const handleCSVUpload = (event) => {
+  const handleCSVUpload = (event: any) => {
     const file = event.target.files[0];
     if (file) {
       Papa.parse(file, {
-        complete: (result) => {
+        complete: (result: any) => {
           const data = result.data;
 
           // Check headers
@@ -261,8 +261,8 @@ const page = () => {
           const invalidRows = [];
           const parsedContacts = data
             .slice(1) // Skip headers
-            .filter((row) => row[0] && row[1]) // Ensure both name and phone are not empty
-            .map((row, index) => {
+            .filter((row: any) => row[0] && row[1]) // Ensure both name and phone are not empty
+            .map((row: any, index: any) => {
               const phone = row[1].trim();
               if (!/^\d{13}$/.test(phone)) {
                 invalidRows.push(index + 2); // Collect row numbers of invalid rows

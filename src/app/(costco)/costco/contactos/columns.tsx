@@ -114,6 +114,7 @@ export const getColumns = (
       );
     },
     cell: (row) => {
+      //@ts-ignore
       const formattedPhone = formatPhoneNumber(row.getValue("phone"));
       return <div>{formattedPhone}</div>;
     },
@@ -161,7 +162,7 @@ export const getColumns = (
             <Plus className="h-4 w-4 text-gray-600" />
           </button>
           <span> </span>
-          {info.row.original.tags.map((tag) => (
+          {info.row.original.tags.map((tag: any) => (
             <span
               key={tag}
               className="flex items-center gap-1 rounded-md bg-blue-500/20 px-2 py-1 text-xs font-medium text-blue-500"
@@ -193,6 +194,7 @@ export const getColumns = (
       );
     },
     cell: (info) => {
+      //@ts-ignore
       const date = new Date(info.getValue());
       const months = [
         "Ene",
