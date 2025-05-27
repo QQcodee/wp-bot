@@ -220,7 +220,7 @@ const startSock = async (account, webhookUrl = null, groupListener = null) => {
           continue; // skip text batching
         }
 
-        // ✅ Handle text batching
+        // ✅ Handle text batching (including replies)
         const text =
           content?.conversation ||
           content?.extendedTextMessage?.text ||
@@ -229,6 +229,20 @@ const startSock = async (account, webhookUrl = null, groupListener = null) => {
 
         if (!text) continue;
 
+        // Optional: Extract quoted message (if reply)
+        const contextInfo = content?.extendedTextMessage?.contextInfo;
+        const quoted = contextInfo?.quotedMessage;
+
+        let originalText = null;
+
+        if (quoted) {
+          originalText =
+            quoted?.conversation ||
+            quoted?.extendedTextMessage?.text ||
+            quoted?.imageMessage?.caption ||
+            "[Unsupported original message]";
+        }
+
         if (!messageQueues.has(jid)) {
           messageQueues.set(jid, []);
         }
@@ -236,9 +250,10 @@ const startSock = async (account, webhookUrl = null, groupListener = null) => {
         messageQueues.get(jid).push({
           timestamp,
           content: text,
+          ...(originalText && { repliedTo: originalText }), // include only if reply
         });
 
-        // Reset timer
+        // Reset batching timer
         if (timers.has(jid)) {
           clearTimeout(timers.get(jid));
         }
@@ -842,6 +857,48 @@ app.get("/groups/:account/:jid/participants", async (req, res) => {
   } catch (error) {
     console.error("Error fetching group participants:", error);
     res.status(500).json({ error: "Failed to fetch participants." });
+  }
+});
+
+app.post("/clear-auth", async (req, res) => {
+  const { folder } = req.body;
+  if (!folder) return res.status(400).json({ error: "Folder is required" });
+
+  const folderPath = getRootFolder(folder);
+
+  try {
+    // 1. Delete local folder
+    await fs.remove(folderPath);
+
+    // 2. Delete all files inside the remote folder in Supabase
+    const { data: files, error: listError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .list(folder, { limit: 100 });
+
+    if (listError) throw listError;
+
+    if (files.length > 0) {
+      const filePaths = files.map((f) => `${folder}/${f.name}`);
+      const { error: deleteError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .remove(filePaths);
+      if (deleteError) throw deleteError;
+    }
+
+    // 3. Remove from local AUTH_DIRS map
+    delete AUTH_DIRS[folder];
+
+    // 4. Refresh folder list from Supabase
+    await listFoldersOnLoad(BUCKET_NAME);
+
+    res.status(200).json({
+      success: true,
+      message: `Cleared local and remote data for '${folder}'`,
+      authDirs: AUTH_DIRS,
+    });
+  } catch (err) {
+    console.error("Clear error:", err.message);
+    res.status(500).json({ error: "Failed to clear folder." });
   }
 });
 
