@@ -187,10 +187,6 @@ const startSock = async (account, webhookUrl = null, groupListener = null) => {
       if (type !== "notify") return;
 
       for (const message of messages) {
-        if (!message.message) {
-          console.warn("Skipping message: failed to decrypt.");
-          continue;
-        }
         const jid = message.key.remoteJid;
         const timestamp = message.messageTimestamp || Date.now();
         const content = message.message;
