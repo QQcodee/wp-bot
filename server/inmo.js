@@ -132,6 +132,8 @@ const messageQueues = new Map(); // jid => [text messages]
 const timers = new Map(); // jid => timeout ID
 const INACTIVITY_DELAY = 10000; // 10 seconds
 
+const messageStore = new Map(); // key: message ID, value: full message object
+
 const startSock = async (account, webhookUrl = null, groupListener = null) => {
   if (!AUTH_DIRS[account]) {
     console.log(`Invalid account: ${account}`);
@@ -145,9 +147,16 @@ const startSock = async (account, webhookUrl = null, groupListener = null) => {
 
   console.log(`Starting WhatsApp session for ${account}`);
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRS[account]);
-  const sock = makeWASocket({ auth: state });
+  const sock = makeWASocket({
+    auth: state,
+    getMessage: async (key) => {
+      const stored = messageStore.get(key.id);
+      return stored?.message || undefined;
+    },
+  });
 
   // Store socket and webhook together
+
   sockets[account] = { sock, webhookUrl };
 
   sock.ev.on("connection.update", async (update) => {
@@ -187,6 +196,15 @@ const startSock = async (account, webhookUrl = null, groupListener = null) => {
       if (type !== "notify") return;
 
       for (const message of messages) {
+        if (message.message) {
+          messageStore.set(message.key.id, message);
+
+          // Delete from memory after 60 seconds
+          setTimeout(() => {
+            messageStore.delete(message.key.id);
+          }, 60 * 1000);
+        }
+
         if (message.key.fromMe) continue; // 🛑 Ignore messages sent by yourself
 
         const jid = message.key.remoteJid;

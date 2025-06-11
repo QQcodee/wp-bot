@@ -16,6 +16,9 @@ import {
   HistoryIcon,
   Webhook,
   Activity,
+  ChartArea,
+  MessageCircle,
+  House,
 } from "lucide-react";
 
 import {
@@ -47,6 +50,20 @@ const items = [
     menuaction: true,
     actionUrl: "crear",
   },
+  {
+    title: "Chats",
+    url: "chats",
+    icon: MessageCircle,
+    menuaction: true,
+    actionUrl: "crear",
+  },
+  {
+    title: "Inventario",
+    url: "inventario",
+    icon: House,
+    menuaction: true,
+    actionUrl: "crear",
+  },
 
   {
     title: "Campañas Activas",
@@ -54,6 +71,7 @@ const items = [
     icon: ListMinusIcon,
     menuaction: false,
   },
+
   {
     title: "Historial de Campañas",
     url: "historial",
